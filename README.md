@@ -43,17 +43,17 @@ If the destination table already exists, then **csv2sql** assumes that it contai
 
 ## Installation
 
-1. Verify that you have [**Ruby**](https://www.ruby-lang.org/) 1.9.3 (released October 2011) or later installed:
+1. Verify that you have [Ruby](https://www.ruby-lang.org/) 1.9.3 (released October 2011) or later installed:
 
         ruby --version
 
     Earlier versions may also work, but are untested.
 
-2. Verify that you have [**SQlite**](https://sqlite.org/) 3.6.16 or later installed:
+2. Verify that you have [SQlite](https://sqlite.org/) 3.6.16 or later installed:
 
         sqlite3 -version
 
-3. Verify that you have the [**sqlite3**](https://github.com/sparklemotion/sqlite3-ruby) Ruby module installed. For example, if you're using [RubyGems](https://rubygems.org/):
+3. Verify that you have the [sqlite3](https://github.com/sparklemotion/sqlite3-ruby) Ruby module installed. For example, if you're using [RubyGems](https://rubygems.org/):
 
         gem list sqlite3
 
