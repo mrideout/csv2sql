@@ -1,0 +1,4 @@
+.ruby-version
+*.swp
+csv2sqlite.db
+*.csv

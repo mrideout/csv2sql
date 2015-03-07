@@ -1,0 +1,152 @@
+#!/usr/bin/env ruby
+
+# csv2sql - a script for importing CSV files into SQLite - http://csv2sql.org/
+
+require 'csv'
+require 'fcntl'
+require 'fileutils'
+require 'optparse'
+require 'sqlite3'
+
+def verbose(message)
+  puts "\n #{message}" if $verbose
+end
+
+def error(message)
+  abort "ERROR: #{message}"
+end
+
+def validate_options(file)
+  # If a CSV file was specified, verify that it exists
+  if file != ''
+    if File.exist?(file)
+      verbose "Will read data from #{file}."
+    else
+      error "the CSV file that you specified (#{file}) does not exist. Exiting."
+    end
+  # Otherwise, verify that standard input exists
+  else
+    if $stdin.fcntl(Fcntl::F_GETFL, 0) == 0
+      verbose "Will read data from standard input."
+    else
+      error "you did not specify a CSV input file, or provide standard input. Exiting."
+    end
+  end
+end
+
+# Prepare the database
+def prepare_database(db_file)
+  verbose "Opening the #{db_file} database."
+  db = SQLite3::Database.new db_file
+end
+
+# Import the CSV file
+def import_csv_file(db, encoding, file, table)
+  verbose "Reading the header row."
+  row_num = 0
+
+  # Decide whether to get the CSV data from a file or STDIN
+  if file == ''
+    csv = CSV($stdin)
+    if table == ''
+      table = 'stdin'
+    end
+  else
+    csv = CSV.open(file, encoding:encoding)
+  end
+
+  # Process each line of the CSV data
+  csv.each do |row|
+    # header row
+    if row_num == 0
+      verbose "Columns are: #{row.inspect}"
+
+      column_defs = ""
+      column_names = ""
+      column_placeholders = ""
+
+      row.each do |column|
+        column_defs << "#{column} VARCHAR, "
+        column_names << "#{column}, "
+        column_placeholders << "?, "
+      end
+
+      # Remove the comma after last column
+      column_defs.sub!(/,\ \Z/, '')
+      column_names.sub!(/,\ \Z/, '')
+      column_placeholders.sub!(/,\ \Z/, '')
+
+      verbose "Creating the #{table} table:"
+      create_table_query = "CREATE TABLE IF NOT EXISTS #{table} (#{column_defs})"
+      verbose "#{create_table_query};"
+      db.execute create_table_query
+
+      verbose "Prepared statement is:"
+      prepared_statement = "INSERT INTO #{table} (#{column_names}) VALUES (#{column_placeholders})"
+      verbose "#{prepared_statement};"
+      @insert = db.prepare(prepared_statement)
+    # non-header rows
+    else
+      verbose "Inserting row #{row_num}."
+      @insert.execute(row)
+    end
+    row_num += 1
+  end
+end
+
+# Initialize variables
+db_file = 'csv2sql.db'
+encoding = 'UTF-8:UTF-8'
+file = ''
+table = ''
+$verbose = false
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$PROGRAM_NAME} [options]"
+
+  opts.on('-d', '--database DATABASE', 'Database to import into. Default is "csv2sql.db"') do |d|
+    db_file = d
+  end
+
+  opts.on('-e', '--encoding INPUT:OUTPUT', 'Input and output encoding. Default is "UTF-8:UTF-8"') do |e|
+    encoding = e
+  end
+
+  opts.on('-f', '--file FILENAME', 'CSV file to import. You may alternately pipe CSV data into standard input') do |f|
+    file = f
+    if table == ''
+      # SQLite treats periods as a delimiter between a database, and table 
+      #   name, so replace any periods in the table name with underscores
+      table = f.gsub('.', '_')
+    end
+  end
+
+  opts.on('-h', '--help', 'Print this help message') do 
+    puts opts
+    exit
+  end
+
+  opts.on('-t', '--table TABLENAME', 'Table to import into. Default is the name of the file being imported from or "stdin" if the input is from standard input. Periods in the filename are replaced with underscores') do |t|
+    table = t
+  end
+
+  opts.on('-v', '--verbose', 'Print verbose output') do
+    $verbose = true
+  end
+
+  opts.on('-V', '--version', 'Print version number') do
+    puts "0.1"
+    exit
+  end
+
+end.parse!
+
+# Validate the options that were selected
+validate_options(file)
+
+# Prepare the database
+db = prepare_database(db_file)
+
+# Import the CSV file
+import_csv_file(db, encoding, file, table)
+
