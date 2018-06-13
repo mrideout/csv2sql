@@ -56,41 +56,43 @@ def import_csv_file(db, encoding, file, table)
   end
 
   # Process each line of the CSV data
-  csv.each do |row|
-    # header row
-    if row_num == 0
-      verbose "Columns are: #{row.inspect}"
+  db.transaction do
+    csv.each do |row|
+      # header row
+      if row_num == 0
+        verbose "Columns are: #{row.inspect}"
 
-      column_defs = ""
-      column_names = ""
-      column_placeholders = ""
+        column_defs = ""
+        column_names = ""
+        column_placeholders = ""
 
-      row.each do |column|
-        column_defs << "#{column} VARCHAR, "
-        column_names << "#{column}, "
-        column_placeholders << "?, "
+        row.each do |column|
+          column_defs << "#{column} VARCHAR, "
+          column_names << "#{column}, "
+          column_placeholders << "?, "
+        end
+
+        # Remove the comma after last column
+        column_defs.sub!(/,\ \Z/, '')
+        column_names.sub!(/,\ \Z/, '')
+        column_placeholders.sub!(/,\ \Z/, '')
+
+        verbose "Creating the #{table} table:"
+        create_table_query = "CREATE TABLE IF NOT EXISTS #{table} (#{column_defs})"
+        verbose "#{create_table_query};"
+        db.execute create_table_query
+
+        verbose "Prepared statement is:"
+        prepared_statement = "INSERT INTO #{table} (#{column_names}) VALUES (#{column_placeholders})"
+        verbose "#{prepared_statement};"
+        @insert = db.prepare(prepared_statement)
+      # non-header rows
+      else
+        verbose "Inserting row #{row_num}."
+        @insert.execute(row)
       end
-
-      # Remove the comma after last column
-      column_defs.sub!(/,\ \Z/, '')
-      column_names.sub!(/,\ \Z/, '')
-      column_placeholders.sub!(/,\ \Z/, '')
-
-      verbose "Creating the #{table} table:"
-      create_table_query = "CREATE TABLE IF NOT EXISTS #{table} (#{column_defs})"
-      verbose "#{create_table_query};"
-      db.execute create_table_query
-
-      verbose "Prepared statement is:"
-      prepared_statement = "INSERT INTO #{table} (#{column_names}) VALUES (#{column_placeholders})"
-      verbose "#{prepared_statement};"
-      @insert = db.prepare(prepared_statement)
-    # non-header rows
-    else
-      verbose "Inserting row #{row_num}."
-      @insert.execute(row)
+      row_num += 1
     end
-    row_num += 1
   end
 end
 
@@ -115,13 +117,13 @@ OptionParser.new do |opts|
   opts.on('-f', '--file FILENAME', 'CSV file to import. You may alternately pipe CSV data into standard input') do |f|
     file = f
     if table == ''
-      # SQLite treats periods as a delimiter between a database, and table 
+      # SQLite treats periods as a delimiter between a database, and table
       #   name, so replace any periods in the table name with underscores
       table = f.gsub('.', '_')
     end
   end
 
-  opts.on('-h', '--help', 'Print this help message') do 
+  opts.on('-h', '--help', 'Print this help message') do
     puts opts
     exit
   end
@@ -149,4 +151,3 @@ db = prepare_database(db_file)
 
 # Import the CSV file
 import_csv_file(db, encoding, file, table)
-
