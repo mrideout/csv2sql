@@ -67,8 +67,8 @@ def import_csv_file(db, encoding, file, table)
         column_placeholders = ""
 
         row.each do |column|
-          column_defs << "#{column} VARCHAR, "
-          column_names << "#{column}, "
+          column_defs << "\"#{column}\" VARCHAR, "
+          column_names << "\"#{column}\", "
           column_placeholders << "?, "
         end
 
